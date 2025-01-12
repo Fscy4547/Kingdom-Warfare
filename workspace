@@ -1,0 +1,510 @@
+-- ALL SCRIPTS ON WORKSPACE
+-- Orc fire script
+
+
+function ConnectEvent(Building)
+	if Building:FindFirstChild("MyHealth") then
+		Building.MyHealth.Changed:Connect(function(HP)
+			if HP == Building.MyMaxHealth.Value then 
+				Building.HealthLabel.Enabled = false
+			else
+				Building.HealthLabel.Enabled = true
+			end
+			
+			Building.HealthLabel.MainFrame.Label1.Size = UDim2.new(HP/Building.MyMaxHealth.Value, 0, 1, 0)
+				
+			if HP < 20 and Building:FindFirstChild("SmokeParticle") == nil then
+				local SP = game.ServerStorage.Storage.Objects.SmokeParticle:Clone()
+				SP.Position = Building.ClickPart.Position
+				SP.Parent = Building
+			end
+				
+			if HP <= 0 and Building:FindFirstChild("ClickPart") then
+				Building.HealthLabel.Enabled = false
+				Building.ClickPart:Destroy()
+				Unanchor(Building)
+				wait(15)
+				Building.SmokeParticle.Smoke.Enabled = false
+				wait(15)
+				Building:Destroy()
+			end
+		end)
+	end
+end
+
+for i,v in pairs(script.Parent["Buildings"]:GetChildren()) do
+	ConnectEvent(v)
+end
+
+script.Parent["Buildings"].ChildAdded:Connect(function(Child)
+	ConnectEvent(Child)
+end)
+
+
+function Unanchor(Obj)
+	for i,v in pairs(Obj:GetChildren()) do
+		if v:IsA("BasePart") and v.Name ~= "SmokeParticle" then
+			v.Anchored = false
+			game.ServerStorage.Storage.Objects.Blur:Clone().Parent = v
+			game.ServerStorage.Storage.Objects.Fire:Clone().Parent = v
+			game.ServerStorage.Storage.Objects.FireLight:Clone().Parent = v
+			require(game.ReplicatedStorage.ReplicatedUtilities).DebrisAddItem(v, math.random(10, 30))
+		end
+		Unanchor(v)
+	end
+end
+
+-- script importer for buildings in the start
+game.ServerStorage.Storage["Clan Folder"].OnBuildingAdded:Clone().Parent = script.Parent
+script:Destroy()
+
+--Button manager for global leaderboard
+
+function HideAllExcept(NameOf)
+	for i,v in pairs(script.Parent.Parent.Board.SurfaceGui:GetChildren()) do
+		if v:IsA("ScrollingFrame") then
+			if v.Name ~= NameOf then
+				v.Visible = false
+			else
+				v.Visible = true
+			end
+		end
+	end
+end
+
+for i,v in pairs(script.Parent:GetChildren()) do
+	if v:IsA("BasePart") then
+		v.ClickDetector.MouseClick:Connect(function()
+			HideAllExcept(v.Name)
+		end)
+	end
+end
+
+
+require(game.ServerScriptService.OnJoined:WaitForChild("UpdateGlobalLeaderboards")).UpdateBoards()
+
+-- max zoom distance ( Please find another place to put this i dont want it in the workspace
+
+
+game.Players.PlayerAdded:connect(function(player)
+	wait(0.5) --Players report the script didn't work. Adding this should resolve the issue.
+	player.CameraMaxZoomDistance = 15-- Change this to change zoom distance
+end)
+
+-- SCRIPTS IN LIGHTING
+-- LocalDestroyer 
+
+script:WaitForChild("Obj").Value:Destroy()
+wait(0.1)
+script:Destroy()
+
+-- Scripts in  ReplicatedFirst
+--LoadingScript (please make this better or remove it if needed
+local S = script:WaitForChild("LoadingGUI")
+S.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+S:WaitForChild("GUILoader").Disabled = false
+S:WaitForChild("LoadingManager").Disabled = false
+
+script.Parent:RemoveDefaultLoadingScreen()
+script:Destroy()
+
+-- scropts inside of the LoadingGUI
+-- GUIloader
+local Player = game.Players.LocalPlayer
+local GUI = script.Parent
+
+wait()
+game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
+
+function Stupid()
+	Player:WaitForChild("PlayerGui", 120):SetTopbarTransparency(0)
+end
+for w = 1, 10 do
+	local Worked, Msg = pcall(Stupid)
+	if Worked then break end
+	wait(1)
+end
+
+--------------------------------------------------------------------------------------------------
+
+local Queue = game.ContentProvider.RequestQueueSize -- This is the amount we had at the beginning
+local Percentage = 0
+
+
+
+
+GUI:WaitForChild("Frame1").Visible = true
+for i,v in pairs(GUI:WaitForChild("Frame1"):GetChildren()) do -- Moving them up so they can come down :))
+	if string.sub(v.Name, 1, 4) == "Tree" then
+		v.Position = v.Position + UDim2.new(0, 0, -1.1, 0)
+	end
+end
+
+function Move(BlockFrame) -- A function to move the three blocks
+	local OrigPos = BlockFrame.Position
+	BlockFrame:TweenPosition(BlockFrame.Position + UDim2.new(0, 0, OrigPos.Y.Scale - (OrigPos.Y.Scale - 1.1), 0), "Out", "Quart", 3, true)
+end
+
+
+delay(0, function()
+	while script.Parent ~= nil do
+		local StarterColor = GUI.Frame1.BackgroundColor3
+		local RandomColor = Color3.new(math.random(1, 255)/255, math.random(1, 255)/255, math.random(1, 255)/255)
+		for w = 1, 70 do
+			GUI.Frame1.BackgroundColor3 = StarterColor:lerp(RandomColor, w/70)
+			wait(0.03)
+		end
+	end
+end)
+
+
+	
+
+local CurrentTreeBlock = -1
+local CurrentPerNum = 0
+local DidTurn = false
+while GUI:FindFirstChild("Frame1") do
+	
+	if DidTurn == false then
+		if Player and Player.Character and Player.Character:FindFirstChild("Humanoid") and Player.Character:FindFirstChild("Body Colors") then
+			script.Parent.SkipButton.Visible = true
+			DidTurn = true
+		end
+	end
+	
+	local LoadedContent = game.ContentProvider.RequestQueueSize
+	local Percentage = 100 - (game.ContentProvider.RequestQueueSize/Queue * 100)
+	
+	if Queue < LoadedContent then
+		Queue = LoadedContent
+	end
+	
+
+	if tostring(math.floor(Percentage).."%") == "-nan(ind)%" then
+		Percentage = 100
+	end
+	
+	GUI.Frame1.LoadingBar.Info.Text = math.floor(Percentage).."%"
+	if GUI.Frame1.LoadingBar.Info.Size.X.Scale < Percentage/100 then
+		GUI.Frame1.LoadingBar.Info:TweenSize(UDim2.new(Percentage/100, 0, 1, 0), "Out", "Quart", 0.5, true)
+	end
+	
+	------------------------  TREE ANIMATIONS  ------------------------
+	CurrentPerNum = math.floor(Percentage)/2
+	if CurrentPerNum > CurrentTreeBlock  then -- if the Percentage is over the tree blocks then
+		for w = CurrentTreeBlock, CurrentPerNum do
+			CurrentTreeBlock = CurrentTreeBlock + 1
+			if GUI.Frame1:FindFirstChild("TreeBlock_"..CurrentTreeBlock) then
+				Move(GUI.Frame1["TreeBlock_"..CurrentTreeBlock])
+			end
+		end
+	end
+	
+	
+	if LoadedContent <= 0 then -- If we loaded everything
+		break
+	end
+		
+	wait(0.25)
+end
+
+wait(5)
+script.Parent.Frame1.Visible = false
+script.Parent.SkipButton.Visible = false
+
+
+
+-- LoadingManager
+
+local Player = game.Players.LocalPlayer
+
+function Close()
+	game.Players.LocalPlayer:WaitForChild('PlayerGui'):SetTopbarTransparency(0.5)
+	require(game.ReplicatedStorage.ReplicatedUtilities).DebrisAddItem(script.Parent, 0)
+end
+
+script.Parent:WaitForChild("SkipButton").MouseButton1Click:Connect(function()
+	script.Parent.Frame1.Visible = false
+	script.Parent.SkipButton.Visible = false
+end)
+
+function InititateInvite(InGroup)
+	
+	if Player:WaitForChild("leaderstats"):WaitForChild("Kills").Value == 0 then
+		Close()
+		
+	else
+		script.Parent.DataLoadFrame.LoadDataButton.Visible = false
+		script.Parent.DataLoadFrame.InviteText.Visible = true
+		script.Parent.DataLoadFrame.InviteText2.Visible = true
+		script.Parent.DataLoadFrame.LogoImg.Visible = false
+		script.Parent.DataLoadFrame.OkayButton.Visible = true
+		script.Parent.DataLoadFrame.LatestUpdate.Visible = true
+		
+		if InGroup == false then
+			script.Parent.DataLoadFrame.InviteText.Text = [[Hello there! I'm glad you returned to play again. :)
+			Please thumbs up and favourite the game if you enjoy it.]]
+			script.Parent.DataLoadFrame.InviteText2.Text = [[If you're interested you can provide extra support by joining our group, Dan's Epic Group.]]
+			
+		else
+			script.Parent.DataLoadFrame.InviteText.Text = [[Hello again.
+			Because you joined our game, I'm giving you 100 gold coins. Have fun!]]
+			script.Parent.DataLoadFrame.InviteText2.Text = [[Have any suggestions or bug reports? Visit our Community server to submit! https://discord.gg/Gkrj4yvmwa]]
+		end
+		
+		script.Parent.DataLoadFrame.OkayButton.MouseButton1Click:Connect(function()
+			Close()
+		end)
+	end
+end
+
+
+
+script.Parent.DataLoadFrame.LoadDataButton.MouseButton1Click:Connect(function()
+	if script.Parent.DataLoadFrame.LoadDataButton.Text == "Load my data" then
+		script.Parent.DataLoadFrame.LoadDataButton.Text = "Loading..."
+		
+		if game.ReplicatedStorage.NetCommunications.LoadData:InvokeServer() then
+			script.Parent.DataLoadFrame.LoadDataButton.Text = "Loading success!"
+			game:GetService("StarterGui"):SetCore("ResetButtonCallback", false)
+			wait(1)
+			if not Player:IsInGroup(7196803) then
+				InititateInvite(false)
+			else
+				InititateInvite(true)
+			end
+		else
+			script.Parent.DataLoadFrame.LoadDataButton.Text = "FAILED: Please contact Check It, if this error persists."
+			wait(3)
+			script.Parent.DataLoadFrame.LoadDataButton.Text = "Load my data"
+		end
+	end
+end)
+
+
+if script.Parent.DataLoadFrame:WaitForChild("LatestUpdate"):WaitForChild("Log").TextFits == false then
+	script.Parent.DataLoadFrame.LatestUpdate.Log.TextScaled = true
+end
+
+
+
+-- Scripts inside of replicated storage.
+-- Into folder, Storage, GUIS
+-- Script inside of Box
+local Frame = script.Parent:WaitForChild("MainFrame")
+Frame.Position = UDim2.new(0.35, 0, -0.3, 0)
+local Player = game.Players.LocalPlayer
+Player:WaitForChild("PlayerSounds"):WaitForChild("Notification2"):Play()
+
+
+-- Wait until another box has been removed
+local Boxes = {}
+for i,v in pairs(Player.PlayerGui:GetChildren()) do
+	if v.Name == "Box" then
+		table.insert(Boxes, v)
+	end
+end
+while true do
+	for i,v in pairs(Boxes) do
+		if v.Parent == nil then
+			table.remove(Boxes, i)
+			break
+		end
+	end
+	
+	-- The rest of the boxes are removed
+	if #Boxes == 1 then
+		break
+	end
+	wait(0.25)
+end
+
+
+Frame:WaitForChild("YesButton").MouseButton1Click:Connect(function()
+	game.Players.LocalPlayer:WaitForChild("PlayerSounds").Click:Play()
+	Close()
+end)
+
+Frame:WaitForChild("NoButton").MouseButton1Click:Connect(function()
+	game.Players.LocalPlayer:WaitForChild("PlayerSounds").Click:Play()
+	
+	Close()
+end)
+
+
+function Open()
+	Frame:TweenPosition(UDim2.new(0.35, 0, 0, 0), "Out", "Quad", 0.3, false)
+end
+
+function Close()
+	Frame:TweenPosition(UDim2.new(0.35, 0, -0.3, 0), "In", "Quad", 0.15, false)
+	require(game.ReplicatedStorage.ReplicatedUtilities).DebrisAddItem(script.Parent, 0.1)
+end
+
+Open()
+
+
+
+
+
+
+
+
+
+-- Script insdie of CraftingGui
+require(game.ReplicatedStorage.ReplicatedUtilities).DebrisAddItem(script.Parent, 120)
+local OrigSize = script.Parent:WaitForChild("Frame").Size
+script.Parent.Frame.Size = UDim2.new(0, 0, 0, 0)
+
+local PR = game.ReplicatedStorage.PlayerStorage[game.Players.LocalPlayer.Name.."Resources"]
+local AddedList = {}
+script:WaitForChild("CraftFrame")
+
+
+function OpenGui()
+	local NewTween = game:GetService("TweenService"):Create(script.Parent.Frame, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = OrigSize})
+	NewTween:Play()
+end
+OpenGui()
+function CloseGui()
+	if script.Parent:FindFirstChild("Frame") == nil then return end
+	require(game.ReplicatedStorage.ReplicatedUtilities).DebrisAddItem(script.Parent, 3)
+	
+	local NewTween = game:GetService("TweenService"):Create(script.Parent.Frame, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(script.Parent.Frame.Size.X.Scale * 1.25, 0, script.Parent.Frame.Size.Y.Scale * 1.25, 0)})
+	NewTween:Play()
+	NewTween.Completed:wait()
+	local NewTween = game:GetService("TweenService"):Create(script.Parent.Frame, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Size = UDim2.new(0.05, 0, 0.05, 0)})
+	NewTween:Play()
+	NewTween.Completed:wait()
+	script.Parent.Frame:Destroy()
+end
+
+script.Parent.Frame.CloseButton.MouseButton1Click:Connect(function()
+	game.Players.LocalPlayer.PlayerSounds.Click:Play()
+	CloseGui()
+end)
+
+
+function AddFrame(v)
+	local NewFrame = script.CraftFrame:Clone()
+	NewFrame.ItemImage.Image = v.ItemImage.Texture
+	NewFrame.ItemName.Text = v.Name
+	for w = 1, 3 do
+		if v.ToCraft:GetChildren()[w] ~= nil then
+			local Needed = v.ToCraft:GetChildren()[w]
+			NewFrame:WaitForChild("ItemsNeededList")
+			NewFrame.ItemsNeededList:WaitForChild("ItemNeeded"..w).Image = PR[Needed.Name].ItemImage.Texture
+			NewFrame.ItemsNeededList:WaitForChild("ItemNeeded"..w):WaitForChild("AmountLabel").Text = Needed.Value .."x "..Needed.Name
+		else
+			NewFrame.ItemsNeededList:WaitForChild("ItemNeeded"..w).Visible = false
+		end
+	end
+	
+	-- Craft item
+	NewFrame.CraftButton.MouseButton1Click:Connect(function()
+		game.ReplicatedStorage.NetCommunications.CraftItem:FireServer(game.Players.LocalPlayer.NPCNAME.Value, v.Name, script.Parent.BuildingReference.Value)
+	end)
+	
+	NewFrame.Parent = script.Parent.Frame.List
+end
+
+
+-- Wanderer team cannot craft physical materials
+local ItemsList
+if script.Parent.BuildingReference.Value.Stats.Owner.Value.Name == "Wanderers" then
+	ItemsList = 
+	{
+			{"Gold Coin", "Brick", "Steel Bar", "Sundust"};
+		{"Pitchfork"};
+		{"Recruit Sword", "Recruit Bow", "Magic Ball"};
+		{"Honor Sword", "Rounded Shield", "Short Spear", "Quick Bow", "Noble Sword", "Spellbinder", "Lifemender"};
+		{"Long Sword", "Paladin's Shield", "Holy Sword", "Holy Shield", "Long Spear", "Sign Shield", "Sharp Sword", "Avian Crossbow", "Sharp Blade", "Sharp Blade 2", "Quick Bow", "Decorated Sword", "Oil", "Stoneshaper", "Glamdring", "Lightbane", "Branch of Wisdom"};
+	}
+else
+	ItemsList = 
+	{
+			{"Gold Coin", "Brick", "Steel Bar", "Sundust", "Log", "Stone Block", "Small Stone Block", "Ground Torch", "Rope", "Floor Board", "Plank", "Wooden Wedge", "Long Wooden Piece", "Short Wooden Piece", "Red Carpet", "Blue Carpet", "Green Carpet", "Neon Carpet", "Forest Banner", "Desert Banner", "Arctic Banner"};
+		{"Pitchfork"};
+		{"Recruit Sword", "Recruit Bow", "Magic Ball"};
+		{"Honor Sword", "Rounded Shield", "Short Spear", "Quick Bow", "Noble Sword", "Spellbinder", "Lifemender"};
+		{"Long Sword", "Paladin's Shield", "Holy Sword", "Holy Shield", "Long Spear", "Sign Shield", "Sharp Sword", "Avian Crossbow", "Sharp Blade", "Sharp Blade 2", "Quick Bow", "Decorated Sword", "Oil", "Stoneshaper", "Glamdring", "Lightbane", "Branch of Wisdom"};
+	}
+end
+
+local DisplayGearTypes = {"Bronze", "Iron", "Steel", "Mithril", "Moonstone", "Sundust"}
+local DisplayTypes = {"Items", "Tier1", "Tier2", "Tier3", "Tier4"}
+
+local Type = 1
+local GearType = 1
+
+
+
+function ClearList()
+	for i,v in pairs(script.Parent.Frame.List:GetChildren()) do
+		if v:IsA("Frame") then
+			v:Destroy()
+		end
+	end
+end
+
+
+function LoadItems()
+	ClearList()
+	
+	script.Parent.Frame.TypeButton.Text = "Type: "..DisplayTypes[Type]
+	script.Parent.Frame.GearType.Text = "Gear: "..DisplayGearTypes[GearType]
+	if Type == 1 then
+		script.Parent.Frame.GearType.Visible = false
+		
+		for i,v in pairs(ItemsList[Type]) do
+			AddFrame(PR[v])
+		end
+		
+	else
+		script.Parent.Frame.GearType.Visible = true
+		
+		for i,v in pairs(ItemsList[Type]) do
+			AddFrame(PR[DisplayGearTypes[GearType] .. " " .. v])
+		end
+	end
+end
+
+-- Going though the types
+script.Parent.Frame.TypeButton.MouseButton1Click:Connect(function()
+	Type = Type + 1
+	if #DisplayTypes < Type then
+		Type = 1
+	end
+	LoadItems()
+end)
+
+-- Going through the gear types
+script.Parent.Frame.GearType.MouseButton1Click:Connect(function()
+	GearType = GearType + 1
+	if #DisplayGearTypes < GearType then
+		GearType = 1
+	end
+	LoadItems()
+end)
+
+
+-- Wants to upgrade the building
+script.Parent.Frame.UpgradeButton.MouseButton1Click:Connect(function()
+	game.Players.LocalPlayer.PlayerSounds.Click:Play()
+	CloseGui()
+	game.ReplicatedStorage.NetCommunications.UpgradeRequest:FireServer(game.Players.LocalPlayer.NPCNAME.Value, script.Parent.BuildingReference.Value)
+end)
+
+
+LoadItems()
+
+
+local OrigPos = game.Players.LocalPlayer.Character.HumanoidRootPart.Position
+local HRP = game.Players.LocalPlayer.Character.HumanoidRootPart
+
+while wait(0.2) do
+	if (HRP.Position - OrigPos).Magnitude > 7 then
+		CloseGui()
+		break
+	end
+end
