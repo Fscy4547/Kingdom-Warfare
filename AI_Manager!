@@ -1,0 +1,882 @@
+
+-- SCripts inside of ServerScriptService
+-- AI_Manager! improve pathfinding and overhaul ai with the features i listed at top
+local Positions = {CFrame.new(-2.5, -2.4000001, 5, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(2.5, -2.4000001, 5, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(7.5, -2.4000001, 5, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-7.5, -2.4000001, 5, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(2.5, -2.4000001, 9, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-2.5, -2.4000001, 9, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-7.5, -2.4000001, 9, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(7.5, -2.4000001, 9, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-2.5, -2.4000001, 13, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(2.5, -2.4000001, 13, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-12.5, -2.4000001, 5, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(12.5, -2.4000001, 5, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(7.5, -2.4000001, 13, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-7.5, -2.4000001, 13, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(12.5, -2.4000001, 9, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-12.5, -2.4000001, 9, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(2.5, -2.4000001, 17, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-2.5, -2.4000001, 17, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-12.5, -2.4000001, 13, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(12.5, -2.4000001, 13, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-7.5, -2.4000001, 17, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(7.5, -2.4000001, 17, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(12.5, -2.4000001, 17, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-12.5, -2.4000001, 17, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(2.5, -2.4000001, 21, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-2.5, -2.4000001, 21, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-7.5, -2.4000001, 21, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(7.5, -2.4000001, 21, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(12.5, -2.4000001, 21, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-12.5, -2.4000001, 21, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-2.5, -2.4000001, 25, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(2.5, -2.4000001, 25, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(7.5, -2.4000001, 25, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-7.5, -2.4000001, 25, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-12.5, -2.4000001, 25, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(12.5, -2.4000001, 25, 1, 0, 0, 0, 1, 0, 0, 0, 1)}
+local CustomFightingStyles = require(script.FightingScript)
+local PS = game:GetService("PathfindingService")
+local CS = game:GetService("CollectionService")
+local GateManager = require(game.ServerStorage.Storage.Scripts.GateOpener)
+
+function CheckForErrors(Characters)
+	for i,v in pairs(Characters) do
+		if v.Parent == nil or v:FindFirstChild("HumanoidRootPart") == nil or v:FindFirstChild("Humanoid") == nil then
+			return true
+		elseif v:FindFirstChild("Health") and v.Health:FindFirstChild("Revived") and v.Health.Revived.Value ~= 100 then
+			return true
+		end
+	end
+	return false
+end
+
+
+
+
+-- Bubble algorithm
+-- Puts a value in the table in order. Especially useful if the tables are long.
+-- First time wiritng this out. I'm SURE you can do better the next time, so take a look at it maybe in a year's time?
+function GetOrderedTablePos(WorkTable, EnemyDistance)
+	local StartValue, EndValue = #WorkTable > 0 and 1 or 0, #WorkTable
+	
+	for w = 1, 1000 do
+		local MidValue = math.floor((EndValue-StartValue)/2) + StartValue
+		
+		
+		-- If the table is empty
+		if MidValue == 0 then
+			return 1
+			
+		-- If we need to put it at the end of the table
+		elseif StartValue > EndValue then
+			return MidValue+1
+			
+			-- If it's lower
+		elseif EnemyDistance < WorkTable[MidValue]["Distance"] then
+			EndValue = MidValue-1
+			
+			-- If it's higher
+		elseif EnemyDistance > WorkTable[MidValue]["Distance"] then
+			StartValue = MidValue+1
+		else
+			return MidValue == 0 and 1 or MidValue
+		end
+	end
+	
+	-- let's hope this never happens lol
+	print("CRASHED.")
+	script.Parent.WebhookAPI["Example Script"].CustomError.Value = "<@190251428974034945> Bubble Algorithm crashed."
+end
+
+
+
+
+function FindNearestEnemy(Attacker, TeamName, Class, ReIterateEnemies)
+	local EnemiesTable = {}
+	local Pos = Attacker.HumanoidRootPart.Position
+
+	-- If the enemy we attacked is still there, why look for the closest one again?
+	if ReIterateEnemies ~= true then
+		local FightingEnemy = Attacker.Stats.Variables.FightingEnemy.Value
+		if FightingEnemy and FightingEnemy.Parent ~= nil and FightingEnemy:IsDescendantOf(game.Workspace.AIFolder) then
+			local Distance = (Attacker.PrimaryPart.Position - FightingEnemy.PrimaryPart.Position).Magnitude
+			
+			if Distance < Attacker.Stats.Variables.AttackRange.Value + 20 then -- Either move closer or if high range can still attack
+				table.insert(EnemiesTable, {["Character"] = FightingEnemy, ["Distance"] = Distance})
+			end
+		end
+	end
+	
+	-- If im orc, I can attack anyone
+	-- If im wanderer I cannot attack anyone
+	-- If Im clan member, I can only attack other clan members
+	if #EnemiesTable == 0 then
+		for i,v in pairs(game.Players:GetPlayers()) do
+			if v.Character and TeamName ~= v.Team.Name then
+				if TeamName == "Orcs" or TeamName ~= "Wanderers" and v.Team.Name ~= "Wanderers" then
+			
+					local Distance = v:DistanceFromCharacter(Pos)
+					if Distance < 1500 and v.Character.Health.Revived.Value == 100 then
+						if Class == "Archmage" then
+							if v.Character.HumanoidRootPart:FindFirstChild("ElectrocutionEmitter") == nil then
+								table.insert(EnemiesTable, GetOrderedTablePos(EnemiesTable, Distance), {["Character"] = v.Character, ["Distance"] = Distance})
+							end
+						else
+							table.insert(EnemiesTable, GetOrderedTablePos(EnemiesTable, Distance), {["Character"] = v.Character, ["Distance"] = Distance})
+						end
+					end
+				end
+			end
+		end
+		
+		
+		-- By default a team cannot attack itself VVVVV
+		-- If Im orc, I can attack anyone
+		-- If im wanderer I can only attack orcs
+		-- Im clan member I can only attack other clans and orcs
+		
+		for i,Clan in pairs(game.Workspace.AIFolder:GetChildren()) do
+			if TeamName ~= Clan.Name then
+				if TeamName == "Orcs" or TeamName == "Wanderers" and Clan.Name == "Orcs" or TeamName ~= "Wanderers" and Clan.Name ~= "Wanderers" then
+					for i,Army in pairs(Clan:GetChildren()) do
+						for i,Soldier in pairs(Army:GetChildren()) do
+							local Distance = (Soldier.HumanoidRootPart.Position - Pos).Magnitude
+							
+							if Soldier:FindFirstChild("HumanoidRootPart") and Distance < 1500 then
+								if Class == "Archmage" then
+									if Soldier.HumanoidRootPart:FindFirstChild("ElectrocutionEmitter") == nil then
+										table.insert(EnemiesTable, GetOrderedTablePos(EnemiesTable, Distance), {["Character"] = Soldier, ["Distance"] = Distance})
+									end
+								else
+									table.insert(EnemiesTable, GetOrderedTablePos(EnemiesTable, Distance), {["Character"] = Soldier, ["Distance"] = Distance})
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	
+	
+	if #EnemiesTable == 0 then
+		Attacker.Stats.Variables.FightingEnemy.Value = nil
+		return nil, 99999, EnemiesTable
+	else
+		Attacker.Stats.Variables.FightingEnemy.Value = EnemiesTable[1]["Character"]
+		return EnemiesTable[1]["Character"], EnemiesTable[1]["Distance"], EnemiesTable
+	end
+end
+
+
+-- This is for ranged units
+function CanSee(Attacker, Enemy, Distance)
+	if Distance > 10 then
+		local Pos = math.max(Attacker.HumanoidRootPart.Position.Y, Enemy.HumanoidRootPart.Position.Y) - math.min(Attacker.HumanoidRootPart.Position.Y, Enemy.HumanoidRootPart.Position.Y)
+		
+		-- Needed so that they only try to go around the enemy if the terrain is flat.
+		-- Imagine the sharpshooter walking off the mountain
+		if Pos < 30 then
+			local CheckForClasses = {"Enchanter", "Sorcerer", "Druid", "Warlock", "Archmage", "Scholar", "Archer", "Marksman", "Sharpshooter", "Rider", "Pyromancer", "Hunter", "Huntsman", "Goblin Archer"}
+			
+			for i,v in pairs(CheckForClasses) do
+				if Attacker.Stats.Variables.Class.Value == v then
+					local NewRay = Ray.new(Attacker.Head.Position, (Enemy.Head.Position - Attacker.Head.Position).Unit * 160)
+					local IgnoreList = nil
+					
+					if game.Players:FindFirstChild(Attacker.Parent.Name) then
+						IgnoreList = {Attacker.Parent.Parent, game.Workspace[Attacker.Parent.Name]}
+					else
+						IgnoreList = {Attacker.Parent.Parent}
+					end
+					
+					local Hit, Pos = game.Workspace:FindPartOnRayWithIgnoreList(NewRay, IgnoreList)			
+					
+					if Hit then
+						if Hit.Parent == Enemy or Hit and Hit.Parent.Parent == Enemy then
+							return true
+						end
+						
+						Attacker.Humanoid:MoveTo(Attacker.HumanoidRootPart.Position + CFrame.new(Attacker.HumanoidRootPart.Position, Enemy.HumanoidRootPart.Position).RightVector * 5)
+						return false
+					end
+				end
+			end
+			
+		else
+			return false
+		end
+	end
+	
+	return true
+end
+function Attack(Attacker, Army, TargetAcquaried, Distance, EnemiesTable)
+	Attacker.Stats.Variables.Attacking.Value = true
+	
+	-- Stop moving towards the enemy
+	Attacker.Humanoid.WalkToPoint = Attacker.PrimaryPart.Position
+	
+	local SpeedChange = nil
+	if Attacker.Stats.Variables.Class.Value ~= "Rider" and Attacker.Stats.Variables.Class.Value ~= "Ogre" then -- We allow the rider to move freely when attacking
+		SpeedChange = require(game.ServerStorage.Storage.Scripts.Utilities).SetWalkSpeed(Attacker, 0)
+		require(game.ReplicatedStorage.ReplicatedUtilities).DebrisAddItem(SpeedChange, 10)
+	end
+	if Attacker.Stats.Variables.Class.Value ~= "Ogre" or Distance <= 10 then
+		Attacker.HumanoidRootPart.CFrame = CFrame.new(Attacker.HumanoidRootPart.Position, Vector3.new(TargetAcquaried.PrimaryPart.Position.X, Attacker.HumanoidRootPart.Position.Y, TargetAcquaried.PrimaryPart.Position.Z))
+	end
+	
+	-- This is needed to remove the spaces from the classname
+	local FormatClassName = ""
+	for Word in string.gmatch(Attacker.Stats.Variables.Class.Value, "%w+") do
+		FormatClassName = FormatClassName .. Word
+	end
+	local S, E = pcall(CustomFightingStyles[FormatClassName.."Attack"], Attacker, TargetAcquaried, Distance, EnemiesTable)
+	
+	if CheckForErrors({Attacker}) == true then return end
+	
+	if SpeedChange then
+		SpeedChange:Destroy()
+	end
+	Attacker.Stats.Variables.Attacking.Value = false
+	if S == false then
+		error(Attacker.Stats.Variables.Class.Value.. " Error:/n"..E)
+	end
+end
+
+
+
+-- this is "Follow"
+function Target(Attacker, Army, AttackRange, Num, Owner) -- In this instance, the soldier will go after the enemy if they are within stud range
+	local OwnerRoot = Owner.Character and Owner.Character.PrimaryPart and Owner.Character.PrimaryPart
+	if OwnerRoot == nil then return end
+	
+	local EnemyPlayer, Distance, EnemiesTable = FindNearestEnemy(Attacker, Army.Parent.Name, Attacker.Stats.Variables.Class.Value, Army.Value, true)
+
+	EnemyPlayer, Distance = nil, nil
+	for i,Enemy in pairs(EnemiesTable) do
+		local Stats = Enemy["Character"]:FindFirstChild("Stats")
+		local Tool = Stats == nil and Enemy["Character"]:FindFirstChildOfClass("Tool")
+		
+		if Stats and Stats.Variables.Mode.Value ~= "Follow" or Tool and Tool.Stats.ToolType.Value == "Melee Weapon" or Tool and Tool.Stats.ToolType.Value == "Ranged Weapon" then
+			EnemyPlayer = Enemy["Character"]
+			Distance = Enemy["Distance"]
+			break
+		end
+	end
+	local EnemyAndOwnerDistance = EnemyPlayer and (OwnerRoot.Position - EnemyPlayer.HumanoidRootPart.Position).Magnitude or 0
+	
+	
+	if EnemyPlayer and Distance <= AttackRange and EnemyAndOwnerDistance < 50 and Distance < 90 then -- If we can attack, lets do that
+		if CanSee(Attacker, EnemyPlayer, Distance) then
+			Attack(Attacker, Army, EnemyPlayer, Distance, EnemiesTable)
+		end
+		
+		-- owner and enemy are close and soldier and enemy are close
+	elseif EnemyPlayer and EnemyAndOwnerDistance < 50 and Distance < 50 then -- If we're not in range to attack, lets follow the ENEMY (but still in 50 studs range of our owner)
+		Attacker.Humanoid:MoveTo(EnemyPlayer.HumanoidRootPart.Position)
+		
+	elseif Attacker.Stats.Variables.IsStuck.Value and Attacker.Stats.Variables.IsPathfinding.Value == false and (game.Workspace[Army.Name].HumanoidRootPart.Position - Attacker.HumanoidRootPart.Position).Magnitude > 40 then
+		PathFind(Attacker, (OwnerRoot.CFrame * Positions[Num]).p)
+		
+	elseif Attacker.Stats.Variables.IsPathfinding.Value == false then -- Following our owner
+		Attacker.Humanoid:MoveTo((OwnerRoot.CFrame * Positions[Num]).p)
+	end
+	
+end
+
+ -- Here the soldier goes to attack range to enemy, if its not 200 studs away
+function FindAndAttack(Attacker, Army, AttackRange)
+	local EnemyPlayer, Distance, EnemiesTable = FindNearestEnemy(Attacker, Army.Parent.Name, Attacker.Stats.Variables.Class.Value, Army.Value)
+	if EnemyPlayer == nil then
+		Attacker.Stats.Variables.Mode.Value = "Follow"
+		return false
+	end
+	if CheckForErrors({EnemyPlayer, Attacker}) == true then return end
+	
+	if Distance <= AttackRange then
+		if CanSee(Attacker, EnemyPlayer, Distance) then
+			Attack(Attacker, Army, EnemyPlayer, Distance, EnemiesTable)
+		end
+	elseif Distance < 200 then
+		if Attacker.Stats.Variables.IsStuck.Value and Attacker.Stats.Variables.IsPathfinding.Value == false then
+			PathFind(Attacker, EnemyPlayer.HumanoidRootPart.Position)
+		else
+			Attacker.Humanoid:MoveTo(EnemyPlayer.HumanoidRootPart.Position)
+		end
+	end
+	
+	if Distance > 300 then
+		Attacker.Stats.Variables.Timeout.Value = 15
+	elseif Distance > 200 then
+		Attacker.Stats.Variables.Timeout.Value = 10
+	end
+end
+
+-- ORC VERSION
+function FindAndAttack2(Attacker, Army, AttackRange)
+	local EnemyPlayer, Distance, EnemiesTable = FindNearestEnemy(Attacker, Army.Parent.Name, Attacker.Stats.Variables.Class.Value, Army.Value)
+	if EnemyPlayer == nil then
+		Attacker.Stats.Variables.Timeout.Value = 30
+		return false
+	end
+	if CheckForErrors({EnemyPlayer, Attacker}) == true then return end
+	
+	if Distance <= AttackRange then
+		if CanSee(Attacker, EnemyPlayer, Distance) then
+			Attack(Attacker, Army, EnemyPlayer, Distance, EnemiesTable)
+		end
+		
+	elseif Attacker.Stats.Variables.IsStuck.Value then
+		if Attacker.Stats.Variables.IsPathfinding.Value == false then
+			PathFind(Attacker, EnemyPlayer.PrimaryPart.Position)
+		end
+	else
+		Attacker.Humanoid:MoveTo(EnemyPlayer.PrimaryPart.Position)
+	end
+	
+	if Distance > 250 then
+		Attacker.Stats.Variables.Timeout.Value = 20
+	elseif Distance > 150 then
+		Attacker.Stats.Variables.Timeout.Value = 10
+	end
+end
+
+
+function Stationary(Attacker, Army, AttackRange) -- Here the soldier waits in a single position, and will chase enemies up to a x studs radius
+	local EnemyPlayer, Distance, EnemiesTable = FindNearestEnemy(Attacker, Army.Parent.Name, Attacker.Stats.Variables.Class.Value, Army.Value)
+	if EnemyPlayer == nil then
+		Attacker.Humanoid:MoveTo(Attacker.Stats.Variables.StationaryPos.Value)
+		Attacker.Stats.Variables.Timeout.Value = 30
+		return false
+	end
+	if CheckForErrors({EnemyPlayer, Attacker}) == true then return end
+	
+	if Distance <= AttackRange then
+		if CanSee(Attacker, EnemyPlayer, Distance) then
+			Attack(Attacker, Army, EnemyPlayer, Distance, EnemiesTable)
+		end
+		
+	elseif (EnemyPlayer.HumanoidRootPart.Position - Attacker.Stats.Variables.StationaryPos.Value).Magnitude < 25 then
+		Attacker.Humanoid:MoveTo(EnemyPlayer.HumanoidRootPart.Position)
+	else
+		Attacker.Humanoid:MoveTo(Attacker.Stats.Variables.StationaryPos.Value)
+	end
+	
+	if Distance > 250 then
+		Attacker.Stats.Variables.Timeout.Value = 30
+	elseif Distance > 200 then
+		Attacker.Stats.Variables.Timeout.Value = 10
+	end
+end
+
+
+function AttackObject(Attacker, Object, Army, AttackRange)
+	local EnemyPlayer, Distance, EnemiesTable = FindNearestEnemy(Attacker, Army.Parent.Name, Attacker.Stats.Variables.Class.Value, Army.Value)
+	if Attacker.Stats.Variables.Class.Value == "Archmage" or Attacker.Stats.Variables.Class.Value == "Pyromancer" or Attacker.Stats.Variables.Class.Value == "Warlock" or Attacker.Stats.Variables.Class.Value == "Scholar" then AttackRange = 5 end -- Mage cannot harm objects with magic
+	
+	if EnemyPlayer and Distance <= AttackRange then -- If there are enemies near us then let's kill em
+		if CanSee(Attacker, EnemyPlayer, Distance) then
+			Attack(Attacker, Army, EnemyPlayer, Distance, EnemiesTable)
+		end
+		
+		
+	elseif Object == nil or Object:IsDescendantOf(game.Workspace) == false or Object.Stats.MyHealth.Value <= 0 then -- If the gate is already destroyed, we set the soldiers to attack mode or follow	
+		if Distance < 100 then
+			Attacker.Stats.Variables.Mode.Value = "Attack"
+		else
+			Attacker.Stats.Variables.Mode.Value = "Follow"
+		end
+		
+	elseif (Attacker.HumanoidRootPart.Position - Object.PrimaryPart.Position).Magnitude <= AttackRange + Object.PrimaryPart.Size.X then -- If we are close to the gate, let's damage it
+		Attack(Attacker, Army, Object, (Attacker.HumanoidRootPart.Position - Object.PrimaryPart.Position).Magnitude, EnemiesTable)
+		
+	else -- If the soldier isn't close enough to the gate
+		Attacker.Humanoid:MoveTo(Object.PrimaryPart.Position)
+		Attacker.Stats.Variables.Timeout.Value = 5
+	end
+end
+
+
+function AttackObject2(Attacker, Object, Army, AttackRange) -- This is a special attack meant for orcs
+	if Object == nil or Object.Parent == nil or Object:IsDescendantOf(game.Workspace) == false or Object.Stats.MyHealth.Value <= 0 then
+		Attacker.Stats.Variables.Mode.Value = "Attack"
+		Attacker.Stats.Variables.ObjectTarget.Value = nil
+		return
+	end
+	local EnemyPlayer, Distance, EnemiesTable = FindNearestEnemy(Attacker, "Orcs", Attacker.Stats.Variables.Class.Value, Army.Value)
+	
+	
+	if EnemyPlayer and Distance <= AttackRange then -- If there are enemies near us then let's kill em
+		if CanSee(Attacker, EnemyPlayer, Distance) then
+			Attack(Attacker, Army, EnemyPlayer, Distance, EnemiesTable)
+		end
+		
+	elseif EnemyPlayer and Distance < 10 then
+		Attacker.Humanoid:MoveTo(EnemyPlayer.HumanoidRootPart.Position)
+		Attacker.Stats.Variables.Timeout.Value = 5
+		Attacker.Stats.Variables.ObjectTarget.Value = nil
+		
+	elseif Object.Stats.MyHealth.Value <= 0 then -- If the gate is already destroyed, we set the orc to destroy the flag
+		Attacker.Stats.Variables.ObjectTarget.Value = nil
+		
+	elseif Attacker.Stats.Variables.IsStuck.Value then
+		if Attacker.Stats.Variables.IsPathfinding.Value == false then
+			PathFind(Attacker, Object.PrimaryPart.Position)
+		else -- If we are already pathfinding, just time out until its over
+			Attacker.Stats.Variables.Timeout.Value = 5
+		end
+		
+	elseif (Attacker.HumanoidRootPart.Position - Object.PrimaryPart.Position).Magnitude <= AttackRange + Object.PrimaryPart.Size.X then -- If we are close to the gate, let's damage it
+		Attack(Attacker, Army, Object, Distance, true)
+		
+	else -- If the soldier isn't close enough to the gate
+		Attacker.Humanoid:MoveTo(Object.PrimaryPart.Position)
+		Attacker.Stats.Variables.Timeout.Value = 5
+	end
+end
+
+-- Orc version
+function Stationary2(Attacker, Army, AttackRange) -- Here the soldier waits in a single position, and will chase enemies up to a x studs radius
+	local EnemyPlayer, Distance, EnemiesTable = FindNearestEnemy(Attacker, Army.Parent.Name, Attacker.Stats.Variables.Class.Value, Army.Value)
+	if EnemyPlayer == nil then
+		Attacker.Humanoid:MoveTo(Attacker.Stats.Variables.StationaryPos.Value)
+		Attacker.Stats.Variables.Timeout.Value = 30
+		return false
+	end
+	if CheckForErrors({EnemyPlayer, Attacker}) == true then return end
+	
+	if Attacker.Stats.Variables.IsStuck.Value then
+		if Attacker.Stats.Variables.IsPathfinding.Value == false then
+			PathFind(Attacker, Attacker.Stats.Variables.StationaryPos.Value)
+		else -- If we are already pathfinding, just time out until its over
+			Attacker.Stats.Variables.Timeout.Value = 5
+		end
+		
+	elseif Distance <= AttackRange then
+		if CanSee(Attacker, EnemyPlayer, Distance) then
+			Attack(Attacker, Army, EnemyPlayer, Distance, EnemiesTable)
+		end
+	elseif (EnemyPlayer.HumanoidRootPart.Position - Attacker.Stats.Variables.StationaryPos.Value).Magnitude < 100 then
+		Attacker.Humanoid:MoveTo(EnemyPlayer.HumanoidRootPart.Position)
+	else
+		Attacker.Humanoid:MoveTo(Attacker.Stats.Variables.StationaryPos.Value)
+	end
+	if Distance > 200 then
+		Attacker.Stats.Variables.Timeout.Value = 20
+	end
+end
+
+-- The goblin chief uses this function. He will direct his sub soldiers to attack the clan and to attack enemies
+function AttackClan(Attacker, Army, AttackRange)
+	local EnemyPlayer, Distance, EnemiesTable = FindNearestEnemy(Attacker, "Orcs", Attacker.Stats.Variables.Class.Value, Army.Value)
+	local Clan = Attacker.Stats.Variables.PrimaryTarget.Value
+	local TargetBuilding = Attacker.Stats.Variables.ObjectTarget.Value
+	
+	-- Pick a building to target within the clan
+	if Clan ~= nil and Clan.Parent and Clan:IsDescendantOf(game.Workspace.TribeAreas) then
+		if TargetBuilding == nil or TargetBuilding.Parent == nil or TargetBuilding.PrimaryPart == nil then
+			
+			-- First check for the closest clan buildings (stables, barracks, etc)
+			local ClosestBuilding, BuildingDistance = nil, 999999
+			for i,Building in pairs(Clan.Castle:GetChildren()) do
+				if Building:FindFirstChild("Settings") and Building.PrimaryPart then
+					if (Building.PrimaryPart.Position - Attacker.PrimaryPart.Position).Magnitude < BuildingDistance then
+						ClosestBuilding = Building
+						BuildingDistance = (Building.PrimaryPart.Position - Attacker.PrimaryPart.Position).Magnitude
+					end
+				end
+			end
+			
+			if ClosestBuilding then
+				TargetBuilding = ClosestBuilding
+				Attacker.Stats.Variables.ObjectTarget.Value = ClosestBuilding
+				
+			else
+				-- Since there are no buildings, attack random materials
+				if #Clan.Castle:GetChildren() > 0 then
+					TargetBuilding = Clan.Castle:GetChildren()[Random.new():NextInteger(1, #Clan.Castle:GetChildren())]
+					Attacker.Stats.Variables.ObjectTarget.Value = TargetBuilding
+					
+					
+				-- Looks like the clan literally has nothing left HAHAHAHAH anyway, just set them to attack mode
+				else
+					Attacker.Stats.Variables.ObjectTarget.Value = nil
+					Attacker.Stats.Variables.PrimaryTarget.Value = nil
+					Attacker.Stats.Variables.Mode.Value = "Attack"
+					Attacker.Stats.Variables.SubCommand.Value = ""
+					Attacker.Stats.Variables.SubCommand.ObjectTarget.Value = nil
+					return
+				end
+			end
+		end
+		
+	else -- If player left and clan doesn't exist anymore
+		Attacker.Stats.Variables.Mode.Value = "Attack"
+		Attacker.Stats.Variables.SubCommand.Value = ""
+		Attacker.Stats.Variables.SubCommand.ObjectTarget.Value = nil
+		Attacker.Stats.Variables.ObjectTarget.Value = nil
+		return
+	end
+	
+	Attacker.Stats.Variables.SubCommand.Value = ""
+	Attacker.Stats.Variables.SubCommand.ObjectTarget.Value = nil
+	
+	local TargetBuildingDistance = (Attacker.HumanoidRootPart.Position - TargetBuilding.PrimaryPart.Position).Magnitude
+	if EnemyPlayer and Distance <= AttackRange then -- If there are enemies near us then let's kill em
+		Attack(Attacker, Army, EnemyPlayer, Distance, EnemiesTable)
+		
+	elseif EnemyPlayer and Distance < 95 then
+		Attacker.Stats.Variables.SubCommand.Value = "Attack"
+		Attacker.Humanoid:MoveTo(EnemyPlayer.HumanoidRootPart.Position)
+		Attacker.Stats.Variables.Timeout.Value = 5
+		
+	elseif Attacker.Stats.Variables.IsStuck.Value then
+		if Attacker.Stats.Variables.IsPathfinding.Value == false then
+			PathFind(Attacker, TargetBuilding.PrimaryPart.Position)
+		else -- If we are already pathfinding, just time out until its over
+			Attacker.Stats.Variables.Timeout.Value = 5
+		end
+		
+	elseif TargetBuildingDistance <= AttackRange + TargetBuilding.PrimaryPart.Size.X then -- If we are close to the gate, let's damage it
+		Attacker.Stats.Variables.SubCommand.Value = "AttackObject"
+		Attacker.Stats.Variables.SubCommand.ObjectTarget.Value = TargetBuilding
+		Attack(Attacker, Army, TargetBuilding, (Attacker.HumanoidRootPart.Position - TargetBuilding.PrimaryPart.Position).Magnitude, true)
+		
+	elseif TargetBuildingDistance <= 100 then -- If we are getting close to the gate, set the minions to attack it
+		Attacker.Stats.Variables.SubCommand.Value = "AttackObject"
+		Attacker.Stats.Variables.SubCommand.ObjectTarget.Value = TargetBuilding
+		
+	else -- If the soldier isn't close enough to the gate
+		Attacker.Humanoid:MoveTo(TargetBuilding.PrimaryPart.Position)
+		Attacker.Stats.Variables.Timeout.Value = 5
+	end
+end
+
+
+function Assigned(Attacker, Army, AttackRange) -- Here the archers are put inside towers and shoot (they get buffed inside here)
+	local EnemyPlayer, Distance, EnemiesTable = FindNearestEnemy(Attacker, Army.Parent.Name, Attacker.Stats.Variables.Class.Value, Army.Value)
+	if CheckForErrors({EnemyPlayer, Attacker}) == true then return end
+	
+	if EnemyPlayer and Distance <= AttackRange + 30 then
+		Attack(Attacker, Army, EnemyPlayer, Distance, EnemiesTable)
+	elseif ((Attacker.HumanoidRootPart.Position - Vector3.new(0, Attacker.HumanoidRootPart.Position.Y, 0)) - (Attacker.Stats.Variables.StationaryPos.Value - Vector3.new(0, Attacker.Stats.Variables.StationaryPos.Value.Y, 0))).Magnitude > 10 then
+		Attacker.Humanoid:MoveTo(Attacker.Stats.Variables.StationaryPos.Value)
+	else
+		Attacker:SetPrimaryPartCFrame(CFrame.new(Attacker.Stats.Variables.StationaryPos.Value))
+	end
+	if Distance > 200 then
+		Attacker.Stats.Variables.Timeout.Value = 15
+	elseif Distance > 300 then
+		Attacker.Stats.Variables.Timeout.Value = 30
+	end
+end
+
+
+function Forage(Attacker, Rescource, Army, AttackRange)
+	local EnemyPlayer, Distance, EnemiesTable = FindNearestEnemy(Attacker, Army.Parent.Name, Attacker.Stats.Variables.Class.Value, Army.Value)
+	
+	if Distance <= AttackRange then
+		if CanSee(Attacker, EnemyPlayer, Distance) then
+			Attack(Attacker, Army, EnemyPlayer, Distance, EnemiesTable)
+		end
+		
+		
+	elseif Distance <= AttackRange + 25 then -- If the peasantas are getting attacked
+		Attacker.Humanoid:MoveTo(EnemyPlayer.HumanoidRootPart.Position)
+		
+		-- Mining it here
+	elseif (Attacker.HumanoidRootPart.Position - Rescource.PrimaryPart.Position).Magnitude < 15 then
+		Attack(Attacker, Army, Rescource, Distance)
+	
+	elseif Attacker.Stats.Variables.IsStuck.Value then
+		if Attacker.Stats.Variables.IsPathfinding.Value == false then
+			PathFind(Attacker, Rescource.PrimaryPart.Position)
+		end	
+	else
+		Attacker.Humanoid:MoveTo(Rescource.PrimaryPart.Position)
+		Attacker.Stats.Variables.Timeout.Value = 10
+	end
+end
+
+-- Orc version
+function Assigned2(Attacker, Army, AttackRange) -- Here the archers are put inside towers and shoot (they get buffed inside here)
+	local EnemyPlayer, Distance, EnemiesTable = FindNearestEnemy(Attacker, Army.Parent.Name, Attacker.Stats.Variables.Class.Value, Army.Value)
+	if EnemyPlayer == nil then
+		Attacker:SetPrimaryPartCFrame(CFrame.new(Attacker.Stats.Variables.StationaryPos.Value))
+		Attacker.Stats.Variables.Timeout.Value = 5
+		return false
+	end
+	if CheckForErrors({EnemyPlayer, Attacker}) == true then return end
+	
+	if Attacker.Stats.Variables.IsStuck.Value then
+		if Attacker.Stats.Variables.IsPathfinding.Value == false then
+			PathFind(Attacker, Attacker.Stats.Variables.StationaryPos.Value)
+		else -- If we are already pathfinding, just time out until its over
+			Attacker.Stats.Variables.Timeout.Value = 5
+		end
+		
+	elseif (Attacker.HumanoidRootPart.Position - Attacker.Stats.Variables.StationaryPos.Value).Magnitude > 30 then
+		Attacker.Humanoid:MoveTo(Attacker.Stats.Variables.StationaryPos.Value)
+		
+	elseif Distance <= AttackRange + 50 then
+		Attacker:SetPrimaryPartCFrame(CFrame.new(Attacker.Stats.Variables.StationaryPos.Value))
+		Attack(Attacker, Army, EnemyPlayer, Distance, EnemiesTable)
+
+	else
+		Attacker:SetPrimaryPartCFrame(CFrame.new(Attacker.Stats.Variables.StationaryPos.Value))
+		Attacker.Stats.Variables.Timeout.Value = 30
+	end
+end
+
+-- Orcs following their goblin chiefs
+-- The goblin chief will set them to attack when he wants to
+function FollowLeader(Soldier, Army, AttackRange)
+	local Leader = Soldier.Stats.Variables.PrimaryTarget.Value
+	
+	-- Checking if our sub leader still lives
+	if CheckForErrors({Leader}) == true then
+		Soldier.Stats.Variables.PrimaryTarget.Value = nil
+		Soldier.Stats.Variables.Mode.Value = "Attack"
+		Soldier.Stats.Variables.SubCommand.Value = ""
+		Soldier.Stats.Variables.SubCommand.ObjectTarget.Value = nil
+		return
+		
+	-- If the leader is no longer in attack clan mode, let the soldiers loose
+	elseif Leader.Stats.Variables.Mode.Value ~= "AttackClan" then
+		Soldier.Stats.Variables.Mode.Value = "Attack"
+		Soldier.Stats.Variables.SubCommand.Value = ""
+		Soldier.Stats.Variables.SubCommand.ObjectTarget.Value = nil
+		return
+	end
+	
+	-- Passing on the commands from the leader
+	if Leader.Stats.Variables.SubCommand.Value ~= "" then
+		Soldier.Stats.Variables.SubCommand.Value = Leader.Stats.Variables.SubCommand.Value
+		Soldier.Stats.Variables.SubCommand.ObjectTarget.Value = Leader.Stats.Variables.SubCommand.ObjectTarget.Value
+	
+	elseif Soldier.Stats.Variables.IsStuck.Value and Soldier.Stats.Variables.IsPathfinding.Value == false and (Soldier.PrimaryPart.Position - Leader.PrimaryPart.Position).Magnitude > 40 then
+		PathFind(Soldier, (Leader.PrimaryPart.Position + Soldier.Stats.Variables.StationaryPos.Value))
+		
+	elseif Soldier.Stats.Variables.IsPathfinding.Value == false then -- Following our owner
+		if Soldier.Stats.Variables.StationaryPos.Value == Vector3.new(0, 0, 0) then
+			Soldier.Stats.Variables.StationaryPos.Value = Vector3.new(math.random(-10, 10), 0, math.random(-10, 10))
+		end
+		Soldier.Humanoid:MoveTo(Leader.PrimaryPart.Position + Soldier.Stats.Variables.StationaryPos.Value)
+	end
+end
+
+
+-- Garrison at gates for swordsmen
+function Garrison(Attacker, Army, AttackRange, Building)
+	local EnemyPlayer, Distance, EnemiesTable = FindNearestEnemy(Attacker, Army.Parent.Name, Attacker.Stats.Variables.Class.Value, Army.Value)
+	if CheckForErrors({EnemyPlayer, Attacker}) == true then return end
+	
+	if Building == nil or Building:IsDescendantOf(game.Workspace) == false or Attacker.Stats.Variables.ObjectTarget.Value:IsDescendantOf(game.Workspace) == false then
+		Attacker.Stats.Variables.Mode.Value = "Follow"
+		
+	elseif Attacker.Stats.Variables.IsStuck.Value then
+		if Attacker.Stats.Variables.IsPathfinding.Value == false then
+			PathFind(Attacker, Attacker.Stats.Variables.StationaryPos.Value)
+		else -- If we are already pathfinding, just time out until its over
+			Attacker.Stats.Variables.Timeout.Value = 5
+		end
+		
+	elseif Distance < AttackRange then
+		if CanSee(Attacker, EnemyPlayer, Distance) then
+			Attack(Attacker, Army, EnemyPlayer, Distance, EnemiesTable)
+		end
+		
+	elseif EnemyPlayer and (EnemyPlayer.HumanoidRootPart.Position - Attacker.Stats.Variables.StationaryPos.Value).Magnitude < 20 then
+		if Attacker.Stats.Variables.ObjectTarget.Value.IsOpen.Value == false then
+			GateManager.OpenGate("Server", Attacker.Stats.Variables.ObjectTarget.Value, "Open")
+		end
+		Attacker.Humanoid:MoveTo(EnemyPlayer.HumanoidRootPart.Position)
+		
+	elseif Distance > 75 and Attacker.Stats.Variables.ObjectTarget.Value.IsOpen.Value == true and (Attacker.HumanoidRootPart.Position - Attacker.Stats.Variables.StationaryPos.Value).Magnitude < 2 then
+		wait(3)
+		GateManager.OpenGate("Server", Attacker.Stats.Variables.ObjectTarget.Value, "Close")
+		
+	elseif Distance > 300 then
+		Attacker.Humanoid:MoveTo(Attacker.Stats.Variables.StationaryPos.Value)
+		Attacker.Stats.Variables.Timeout.Value = 20
+	else
+		Attacker.Humanoid:MoveTo(Attacker.Stats.Variables.StationaryPos.Value)
+	end
+end
+
+
+
+-- Guard command (follow a player around)
+function Guard(Attacker, Army, AttackRange, Num) -- In this instance, the soldier will go after the enemy if they are within stud range
+	local EnemyPlayer, Distance, EnemiesTable = FindNearestEnemy(Attacker, Army.Parent.Name, Attacker.Stats.Variables.Class.Value, Army.Value)
+	local GuardingPlayer = Attacker.Stats.Variables.ObjectTarget.Value -- The root part
+	local GuardingHrp = GuardingPlayer.Character.HumanoidRootPart
+	
+	if GuardingPlayer == nil or GuardingPlayer.Parent == nil then
+		Attacker.Stats.Variables.Mode.Value = "Follow"
+		Attacker.Stats.Variables.ObjectTarget.Value = nil
+		return
+	else
+		Num = #game.Workspace.AIFolder[GuardingPlayer.Team.Name][GuardingPlayer.Name]:GetChildren() + Num
+	end
+	
+	if EnemyPlayer then
+		if Distance <= AttackRange then
+			if CanSee(Attacker, EnemyPlayer, Distance) then
+				Attack(Attacker, Army, EnemyPlayer, Distance, EnemiesTable)
+			end
+			
+		elseif Distance < 75 then
+			Attacker.Humanoid:MoveTo(EnemyPlayer.HumanoidRootPart.Position)
+			
+		elseif Attacker.Stats.Variables.IsStuck.Value then
+			if Attacker.Stats.Variables.IsPathfinding.Value == false and (GuardingHrp.Position - Attacker.HumanoidRootPart.Position).Magnitude > 40 then
+				PathFind(Attacker, (GuardingHrp.CFrame * Positions[Num]).p)
+			end
+			
+		else
+			Attacker.Humanoid:MoveTo((GuardingHrp.CFrame * Positions[Num]).p)
+		end
+		
+	else
+		Attacker.Humanoid:MoveTo((GuardingHrp.CFrame * Positions[Num]).p)
+	end
+	
+end
+
+
+
+function PathFind(NPC, ToPos)
+	if CheckForErrors({NPC}) == true then return end
+	NPC.Stats.Variables.IsPathfinding.Value = true
+	-- First let's move back 10 studs shall we
+	NPC.Humanoid:MoveTo(NPC.HumanoidRootPart.Position + NPC.HumanoidRootPart.CFrame.lookVector * -10)
+	wait(1.5)
+	if CheckForErrors({NPC}) == true then return end
+	
+	local Path = PS:FindPathAsync(NPC.HumanoidRootPart.Position, ToPos)
+	local WayPoints = Path:GetWaypoints()
+	
+	if Path.Status == Enum.PathStatus.Success then
+		for i,Point in pairs(WayPoints) do
+			if i > 100 then break end -- Only goes a certain amount of points. By this time they probably won't need to anymore, but also the enemy have probably moved away by now.
+			
+			if CheckForErrors({NPC}) == true then return end
+			
+			if Point.Action == Enum.PathWaypointAction.Jump then
+				NPC.Humanoid.Jump = true
+			end
+			
+			NPC.Humanoid:MoveTo(Point.Position)
+			if i == 1 then
+				wait((NPC.HumanoidRootPart.Position - Point.Position).Magnitude/NPC.Humanoid.WalkSpeed)
+			else
+				wait((WayPoints[i-1].Position - Point.Position).Magnitude/NPC.Humanoid.WalkSpeed)
+			end
+		end
+	end
+	
+	NPC.Stats.Variables.IsStuck.Value = false
+	NPC.Stats.Variables.IsPathfinding.Value = false
+end
+
+-- One has too many ends HAHAHAHAHAHAHA
+local function DoLoopy()
+for i,Clan in pairs(game.Workspace.AIFolder:GetChildren()) do
+		if Clan:IsA("Folder") then
+			for i,Army in pairs(Clan:GetChildren()) do
+				local Owner = game.Players:FindFirstChild(Army.Name)
+				
+				if Owner and Owner.Character.Parent == game.Workspace or Army.Name == "Orc" then
+					for i,Soldier in pairs(Army:GetChildren()) do
+						if Soldier.Stats.Variables.Timeout.Value > 0 then -- If the soldier can skip out some calculations (since there are no enemies nearby)
+							Soldier.Stats.Variables.Timeout.Value = Soldier.Stats.Variables.Timeout.Value - 1
+							
+						else
+							if Soldier.Stats.Variables.Attacking.Value == false then -- If the soldier isn't attacking already, check if there are enemies nearby to attack					
+								delay(0, function()
+									if Soldier.Parent ~= nil and CheckForErrors({Soldier}) == false then
+										local SoldierMode = Soldier.Stats.Variables.Mode
+										
+										if Soldier:FindFirstChild("SelectedPart") then -- If it's a human soldier
+											if SoldierMode.Value ~= "Stationary" and SoldierMode.Value ~= "Assigned" and SoldierMode.Value ~= "Garrisoned" then
+												Soldier.Stats.Variables.StationaryPos.Value = Vector3.new(0,0,0)
+											end
+											
+			--[["FOLLOW"]]					if SoldierMode.Value == "Follow" then -- Soldier looks for enemies within range to chase, if there aren't any then it continues to follow their owner							
+												Target(Soldier, Army, Soldier.Stats.Variables.AttackRange.Value, i, Owner)
+												
+			--[["ATTACK"]]					elseif SoldierMode.Value == "Attack" then -- Soldier goes and attacks the nearest enemy
+												FindAndAttack(Soldier, Army, Soldier.Stats.Variables.AttackRange.Value)
+												
+			--[["STATIONARY"]]				elseif SoldierMode.Value == "Stationary" then -- Soldier stays in the same position, attacks and enemies that come near them
+												if Soldier.Stats.Variables.StationaryPos.Value == Vector3.new(0,0,0) then
+													Soldier.Stats.Variables.StationaryPos.Value = Soldier.HumanoidRootPart.Position
+												end
+												Stationary(Soldier, Army, Soldier.Stats.Variables.AttackRange.Value)
+												
+			--[["ATTACK OBJECT"]]			elseif SoldierMode.Value == "AttackObject" then -- Attacks an object (e.g. gate)
+												AttackObject(Soldier, Soldier.Stats.Variables.ObjectTarget.Value, Army, Soldier.Stats.Variables.AttackRange.Value)
+												
+			--[["ASSIGNED"]]				elseif SoldierMode.Value == "Assigned" then
+												if Soldier.Stats.Variables.StationaryPos.Value == Vector3.new(0,0,0) then
+													Soldier.Stats.Variables.StationaryPos.Value = Soldier.HumanoidRootPart.Position
+												end
+												Assigned(Soldier, Army, Soldier.Stats.Variables.AttackRange.Value)
+												
+			--[["FORAGE"]]					elseif SoldierMode.Value == "Forage" then
+												if Soldier.Stats.Variables.ObjectTarget.Value == nil then
+													SoldierMode.Value = "Follow"
+												else
+													Forage(Soldier, Soldier.Stats.Variables.ObjectTarget.Value, Army, Soldier.Stats.Variables.AttackRange.Value)
+												end
+												
+			--[["GARRISONED"]]				elseif SoldierMode.Value == "Garrisoned" then
+												Garrison(Soldier, Army, Soldier.Stats.Variables.AttackRange.Value, Soldier.Stats.Variables.ObjectTarget.Value)
+												
+				--[["RETREAT"]]				elseif SoldierMode.Value == "Retreat" then
+													Soldier.Stats.Variables.StationaryPos.Value = game.Workspace.TribeAreas[Owner.Team.Name]:FindFirstChildOfClass("SpawnLocation").Position + Vector3.new(math.random(-3, 3), 3, math.random(-3, 3))
+													SoldierMode.Value = "Stationary"
+													
+				--[["GUARD"]]				elseif SoldierMode.Value == "Guard" then
+												if Soldier.Stats.Variables.ObjectTarget.Value == nil then
+													SoldierMode.Value = "Follow"
+												else
+													Guard(Soldier, Army, Soldier.Stats.Variables.AttackRange.Value, i)
+												end
+											end
+	--[[*************************]]		else
+											if Soldier.Stats.Variables.SubCommand.Value == "" or Soldier.Stats.Variables.Mode.Value == "AttackClan" then
+				--[["STATIONARY"]]				if SoldierMode.Value == "Stationary" then
+													if Soldier.Stats.Variables.StationaryPos.Value == Vector3.new(0,0,0) then
+														Soldier.Stats.Variables.StationaryPos.Value = Soldier.HumanoidRootPart.Position
+													end
+													Stationary2(Soldier, Army, Soldier.Stats.Variables.AttackRange.Value)
+													
+				--[["ATTACK CLAN"]]				elseif SoldierMode.Value == "AttackClan" then
+														AttackClan(Soldier, Army, Soldier.Stats.Variables.AttackRange.Value)
+														
+				--[["OBJECT ATTACK"]]			elseif Soldier.Stats.Variables.ObjectTarget.Value ~= nil then
+													AttackObject2(Soldier, Soldier.Stats.Variables.ObjectTarget.Value, Army, Soldier.Stats.Variables.AttackRange.Value)
+													
+				--[["ATTACK"]]					elseif SoldierMode.Value == "Attack" then
+													FindAndAttack2(Soldier, Army, Soldier.Stats.Variables.AttackRange.Value)
+													
+				--[["ASSIGNED"]]				elseif SoldierMode.Value == "Assigned" then
+													if Soldier.Stats.Variables.StationaryPos.Value == Vector3.new(0,0,0) then
+														Soldier.Stats.Variables.StationaryPos.Value = Soldier.HumanoidRootPart.Position
+													end
+													Assigned2(Soldier, Army, Soldier.Stats.Variables.AttackRange.Value)
+												
+				--[["FOLLOWING LEADER"]]		elseif SoldierMode.Value == "FollowLeader" then
+													FollowLeader(Soldier, Army, Soldier.Stats.Variables.AttackRange.Value)
+												end
+											
+											-- In this case, their leader wants them to do something
+											else
+												local SubCommand = Soldier.Stats.Variables.SubCommand
+												if SubCommand.Value == "Attack" then
+													FindAndAttack2(Soldier, Army, Soldier.Stats.Variables.AttackRange.Value)
+													
+												elseif SubCommand.Value == "AttackObject" then
+													AttackObject2(Soldier, SubCommand.ObjectTarget.Value, Army, Soldier.Stats.Variables.AttackRange.Value)
+												end
+												
+												Soldier.Stats.Variables.SubCommand.Value = Soldier.Stats.Variables.PrimaryTarget.Value.Stats.Variables.SubCommand.Value
+												Soldier.Stats.Variables.SubCommand.ObjectTarget.Value = Soldier.Stats.Variables.PrimaryTarget.Value.Stats.Variables.SubCommand.ObjectTarget.Value
+											end
+										end
+									end
+								end)
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
+-- This loop broke once. Didin't fix the error since it was so rare.
+-- It should be pcalled regardless.
+while true do
+	local S, E = pcall(DoLoopy)
+	
+	if S == false then
+		script.Parent.WebhookAPI["Example Script"].CustomError.Value = "<@190251428974034945> AI Manager while loop crashed!/n/n"..E
+	end
+	wait(0.4) -- Jeez louise papa cheese (Consider raising this, if you detect lag in the server)
+end
+
+
+
+
+
