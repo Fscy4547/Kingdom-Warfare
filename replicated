@@ -1,0 +1,564 @@
+-- Script inside of InventoryGUI
+-- Created by hunxrepair
+-- 2019/02/23
+
+
+local Player = game.Players.LocalPlayer
+local OrigSize = script.Parent:WaitForChild("Frame").Size
+script.Parent.Frame.Size = UDim2.new(0, 0, 0, 0)
+
+local Closing = false
+local CurrentTab = "Resources"
+
+local ItemTypes =
+{
+	["Resources"] = "Resource";
+	["Equipment"] = "Equipment";
+	["Soldier Weapons"] = "Soldier Weapon";
+	["Soldier Armours"] = "Soldier Armour";
+}
+
+function Clear()
+	for i,v in pairs(script.Parent.Frame.ItemsDisplay:GetChildren()) do
+		if v:IsA("Frame") then
+			v:Destroy()
+		end
+	end
+end
+
+
+for i,Item in pairs(game.ReplicatedStorage.PlayerStorage[Player.Name.."Resources"]:GetChildren()) do
+	Item.Changed:Connect(function(NewValue)
+		if Closing == false then
+			if Item.ItemType.Value == ItemTypes[CurrentTab] then
+				local Frame = nil
+				
+				for i,ItemFrame in pairs(script.Parent.Frame.ItemsDisplay:GetChildren()) do
+					if ItemFrame:IsA("Frame") then
+						if ItemFrame.NameLabel.Text == Item.Name then
+							Frame = ItemFrame
+							break
+						end
+					end
+				end
+				
+				if Frame then
+					if NewValue == 0 then
+						Frame:Destroy()
+					else
+						Frame.AmountLabel.Text = "x"..NewValue
+					end
+				else
+					CreateItemFrame(Item)
+				end
+			end
+		end
+	end)
+end
+
+
+
+function CreateItemFrame(Item)
+	local NewFrame = script.ItemFrame:Clone()
+	
+	NewFrame.NameLabel.Text = Item.Name
+	NewFrame.AmountLabel.Text = "x"..Item.Value
+	
+	local Model = game.ReplicatedStorage.Storage.Items:FindFirstChild(Item.Name)
+	if Model then
+		local ViewPort = require(game.ReplicatedStorage.ReplicatedUtilities).ModelToGui(NewFrame.ObjectImage, Model, nil, Model.RenderingCFrame.Value, "Normal")
+	end
+	
+	NewFrame.ObjectImage.InputBegan:Connect(function(Input)
+		if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+			
+			if script.Parent:FindFirstChild("ItemOptionsFrame") == nil then
+				Player.PlayerSounds.Click:Play()
+				
+				local NewItemOptionsFrame = script.ItemOptionsFrame:Clone()
+				local InfoFrame = script.InfoFrame:Clone()
+				InfoFrame.Parent = NewItemOptionsFrame
+				
+				
+				
+				InfoFrame.DeleteOneButton.MouseButton1Click:Connect(function()
+					Player.PlayerSounds.Click:Play()
+					game.ReplicatedStorage.NetCommunications.DeleteItems:InvokeServer(Player.NPCNAME.Value, script.Parent.BuildingReference.Value, Item.Name, "One")
+					NewItemOptionsFrame:Destroy()
+				end)
+				
+				InfoFrame.DeleteAllButton.MouseButton1Click:Connect(function()
+					Player.PlayerSounds.Click:Play()
+					if InfoFrame.DeleteAllButton.Text == "Delete All" then
+						InfoFrame.DeleteAllButton.Text = "Sure?"
+						wait(2)
+						if NewItemOptionsFrame.Parent then
+							InfoFrame.DeleteAllButton.Text = "Delete All"
+						end
+						
+					elseif InfoFrame.DeleteAllButton.Text == "Sure?" then
+						InfoFrame.DeleteAllButton.Text = "Okay :("
+						game.ReplicatedStorage.NetCommunications.DeleteItems:InvokeServer(Player.NPCNAME.Value, script.Parent.BuildingReference.Value, Item.Name, "All")
+						NewItemOptionsFrame:Destroy()
+					end
+				end)
+				
+				
+				if CurrentTab == "Soldier Weapons" or CurrentTab == "Soldier Armours" then
+					InfoFrame.EquipButton.Blocky:Destroy()
+					InfoFrame.EquipButton.Text = "Equip"
+					
+					
+					InfoFrame.EquipButton.MouseButton1Click:Connect(function()
+						Player.PlayerSounds.Click:Play()
+						
+						local SelectionFrame = script.SelectionFrame:Clone()
+						
+						SelectionFrame.BackButton.MouseButton1Click:Connect(function()
+							Player.PlayerSounds.Click:Play()
+							
+							SelectionFrame:Destroy()
+							InfoFrame.Visible = true
+						end)
+						
+						
+						local Soldiers = {}
+						local OreType, FindItemName = string.sub(Item.Name, 1, string.find(Item.Name, " ")-1), string.sub(Item.Name, string.find(Item.Name, " ")+1)
+						local SearchLocation = CurrentTab == "Soldier Weapons" and "RequiredWeapons" or "RequiredArmours"
+						
+						
+						for i,Soldier in pairs(game.Workspace.AIFolder[Player.Team.Name][Player.Name]:GetChildren()) do
+							for i,Equipment in pairs(Soldier.Stats[SearchLocation]:GetChildren()) do
+								if Equipment.Value == false then
+									if Equipment.Name == FindItemName and Equipment.Type.Value ~= OreType then
+										table.insert(Soldiers, Soldier)
+									end
+								end
+							end
+						end
+						for i,Soldier in pairs(Player.StoredSoldiers:GetChildren()) do
+							for i,Equipment in pairs(Soldier.Stats[SearchLocation]:GetChildren()) do
+								if Equipment.Value == false then
+									if Equipment.Name == FindItemName and Equipment.Type.Value ~= OreType then
+										table.insert(Soldiers, Soldier)
+									end
+								end
+							end
+						end
+						
+						for i,Soldier in pairs(Soldiers) do
+							local NewOptionButton = script.OptionButton:Clone()
+							NewOptionButton.Text = Soldier.Name
+							
+							NewOptionButton.MouseButton1Click:Connect(function()
+								Player.PlayerSounds.Click:Play()
+								game.ReplicatedStorage.NetCommunications.EquipEquipment:FireServer(Player.NPCNAME.Value, Soldier, Item.Name)
+								
+								NewItemOptionsFrame:Destroy()
+							end)
+							
+							NewOptionButton.Parent = SelectionFrame.List
+						end
+						
+						InfoFrame.Visible = false
+						SelectionFrame.Parent = NewItemOptionsFrame
+					end)
+				end
+				
+				
+				NewItemOptionsFrame.Parent = script.Parent
+				
+				
+				local Mouse = Player:GetMouse()
+				NewItemOptionsFrame.Position = UDim2.new(0, Mouse.X, 0, Mouse.Y - 15)
+				
+				
+				while Closing == false and NewItemOptionsFrame.Parent do
+					if Mouse.X < NewItemOptionsFrame.Roundify.AbsolutePosition.X or Mouse.X > NewItemOptionsFrame.Roundify.AbsolutePosition.X + NewItemOptionsFrame.Roundify.AbsoluteSize.X or Mouse.Y < NewItemOptionsFrame.Roundify.AbsolutePosition.Y or Mouse.Y > NewItemOptionsFrame.Roundify.AbsolutePosition.Y + NewItemOptionsFrame.Roundify.AbsoluteSize.Y then
+						NewItemOptionsFrame:Destroy()
+					end
+					
+					Mouse.Move:wait()
+				end
+			end
+		end
+	end)
+	
+	NewFrame.Parent = script.Parent.Frame.ItemsDisplay
+end
+
+
+function Load()
+	Clear()
+	script.Parent.Frame.ItemsDisplay.CanvasPosition = Vector2.new(0, 0)
+	
+	for i,Item in pairs(game.ReplicatedStorage.PlayerStorage[Player.Name.."Resources"]:GetChildren()) do
+		if Closing then return end
+		
+		if Item.Value > 0 and Item.ItemType.Value == ItemTypes[CurrentTab] then
+			CreateItemFrame(Item)
+			wait(0.05)
+		end
+	end
+	
+	delay(0, function()
+		local Mouse = Player:GetMouse()
+		while Closing == false and #script.Parent.Frame.ItemsDisplay:GetChildren() > 1 do
+			if script.Parent:FindFirstChild("ItemOptionsFrame") == nil then
+				for i,Frame in pairs(script.Parent.Frame.ItemsDisplay:GetChildren()) do
+					if Frame:IsA("Frame") then
+						Frame.BackgroundColor3 = Color3.new(0, 0, 0)
+						
+						if Mouse.X > Frame.AbsolutePosition.X and Mouse.X < Frame.AbsolutePosition.X + Frame.AbsoluteSize.X then
+							if Mouse.Y > Frame.AbsolutePosition.Y and Mouse.Y < Frame.AbsolutePosition.Y + Frame.AbsoluteSize.Y then
+								Frame.BackgroundColor3 = Color3.fromRGB(44, 170, 151)
+							end
+						end
+					end
+				end
+			end
+			Mouse.Move:wait()
+		end
+	end)
+end
+
+
+Load()
+for i,TabButton in pairs(script.Parent.Frame.TabsFrame:GetChildren()) do
+	if TabButton:IsA("TextButton") then
+		TabButton.MouseButton1Click:Connect(function()
+			Player.PlayerSounds.Click:Play()
+			CurrentTab = TabButton.Text
+			Load()
+		end)
+	end
+end
+
+function OpenGui()
+	local NewTween = game:GetService("TweenService"):Create(script.Parent.Frame, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = OrigSize})
+	NewTween:Play()
+end
+OpenGui()
+function CloseGui()
+	if Closing == false then
+		Closing = true
+		if script.Parent:FindFirstChild("ItemOptionsFrame") then script.Parent.ItemOptionsFrame:Destroy() end
+		if script.Parent:FindFirstChild("Frame") == nil then return end
+		require(game.ReplicatedStorage.ReplicatedUtilities).DebrisAddItem(script.Parent, 3)
+		
+		local NewTween = game:GetService("TweenService"):Create(script.Parent.Frame, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(script.Parent.Frame.Size.X.Scale * 1.25, 0, script.Parent.Frame.Size.Y.Scale * 1.25, 0)})
+		NewTween:Play()
+		NewTween.Completed:wait()
+		local NewTween = game:GetService("TweenService"):Create(script.Parent.Frame, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Size = UDim2.new(0.05, 0, 0.05, 0)})
+		NewTween:Play()
+		NewTween.Completed:wait()
+		script.Parent.Frame:Destroy()
+	end
+end
+
+-- Exit the gui
+script.Parent.Frame.ExitButton.MouseButton1Click:Connect(function()
+	Player.PlayerSounds.Click:Play()
+	CloseGui()
+end)
+
+
+
+
+local OrigPos = game.Players.LocalPlayer.Character.HumanoidRootPart.Position
+local HRP = game.Players.LocalPlayer.Character.HumanoidRootPart
+
+while wait(0.2) do
+	if (HRP.Position - OrigPos).Magnitude > 7 then
+		CloseGui()
+		break
+	end
+end
+
+
+-- Script inside of MerchantMenuGUI
+-- Created by hunxrepair
+-- 2018/11/21
+
+
+local Player = game.Players.LocalPlayer
+local OrigSize = script.Parent:WaitForChild("Frame").Size
+script.Parent.Frame.Size = UDim2.new(0, 0, 0, 0)
+
+
+local CurrentTab = "Melee Weapons"
+
+function Clear()
+	for i,v in pairs(script.Parent.Frame.ItemsDisplay:GetChildren()) do
+		if v:IsA("Frame") then
+			v:Destroy()
+		end
+	end
+end
+
+
+local ToolTypes =
+{
+	["Melee Weapons"] = "Melee Weapon";
+	["Ranged Weapons"] = "Ranged Weapon";
+	["Pickaxes"] = "Pickaxe";
+	["Axes"] = "Axe";
+	["Misc. Tools"] = "Misc Tool";
+	["Armours"] = "Armour";
+	["Shields"] = "Shield";
+}
+function Load()
+	Clear()
+	script.Parent.Frame.ItemsDisplay.CanvasPosition = Vector2.new(0, 0)
+	
+	local ToolsGathered = {}
+	for i,Tool in pairs(game.ReplicatedStorage.Storage.Tools:GetChildren()) do
+		if Tool.Name ~= "Labrys" then
+			if Tool.Stats.ToolType.Value == ToolTypes[CurrentTab] then
+				table.insert(ToolsGathered, Tool)
+			end
+		end
+	end
+	
+	-- Re-ordering it
+	local WorkTable = {}
+	for w = 1, #ToolsGathered do
+		local Cheapest, Price, Num = nil, 99999, nil
+	
+		for i,v in pairs(ToolsGathered) do
+			if v.Stats.ItemPrice.Value < Price then
+				Cheapest = v
+				Price = v.Stats.ItemPrice.Value
+				Num = i
+			end
+		end
+		
+		table.insert(WorkTable, Cheapest)
+		table.remove(ToolsGathered, Num)
+	end
+	ToolsGathered = WorkTable
+	
+	
+	for i,Tool in pairs(ToolsGathered) do
+		local NewFrame = script.Frame:Clone()
+		NewFrame.ItemImage.Image = Tool.Stats.ItemImage.Texture
+		NewFrame.Stats.Text = Tool.Stats.Statistics.Value
+		NewFrame.Title.Text = Tool.Name
+		
+		-- 2019/01/24 Currently StarterGear does not replicate to the client. There has been a bug report on the dev forums.
+--		-- Use old code after it has been fixed.
+--		if Player:WaitForChild("StarterGear"):FindFirstChild(Tool.Name) then
+--			NewFrame.BuyButton.BackgroundColor3 = Color3.fromRGB(202, 202, 0)
+--			NewFrame.BuyButton.Text = "Sell ".. Tool.Stats.ItemPrice.Value * 0.4 .. "g"
+--		else
+--			NewFrame.BuyButton.Text = "Buy for "..Tool.Stats.ItemPrice.Value.."g"
+--		end
+
+		if Player.Backpack:FindFirstChild(Tool.Name) or Player.Character:FindFirstChild(Tool.Name) then
+			NewFrame.BuyButton.BackgroundColor3 = Color3.fromRGB(202, 202, 0)
+			NewFrame.BuyButton.Text = "Sell ".. Tool.Stats.ItemPrice.Value * 0.4 .. "g"
+		else
+			NewFrame.BuyButton.Text = "Buy for "..Tool.Stats.ItemPrice.Value.."g"
+		end
+		
+		NewFrame.BuyButton.MouseButton1Click:Connect(function()
+			Player.PlayerSounds.Click:Play()
+			if string.sub(NewFrame.BuyButton.Text, 1, 3) == "Buy" then
+				game.ReplicatedStorage.NetCommunications.BuyItem:InvokeServer(game.Players.LocalPlayer.NPCNAME.Value, Tool.Name, script.Parent.BuildingReference.Value)
+			else
+				game.ReplicatedStorage.NetCommunications.SellItem:InvokeServer(game.Players.LocalPlayer.NPCNAME.Value, Tool.Name, script.Parent.BuildingReference.Value)
+			end
+			Load()
+		end)
+		
+		NewFrame.Parent = script.Parent.Frame.ItemsDisplay
+	end
+end
+
+
+
+Load()
+
+for i,TabButton in pairs(script.Parent.Frame.TabsFrame:GetChildren()) do
+	if TabButton:IsA("TextButton") then
+		TabButton.MouseButton1Click:Connect(function()
+			Player.PlayerSounds.Click:Play()
+			CurrentTab = TabButton.Text
+			Load()
+		end)
+	end
+end
+
+
+function OpenGui()
+	local NewTween = game:GetService("TweenService"):Create(script.Parent.Frame, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = OrigSize})
+	NewTween:Play()
+end
+OpenGui()
+function CloseGui()
+	if script.Parent:FindFirstChild("Frame") == nil then return end
+	require(game.ReplicatedStorage.ReplicatedUtilities).DebrisAddItem(script.Parent, 3)
+	
+	local NewTween = game:GetService("TweenService"):Create(script.Parent.Frame, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(script.Parent.Frame.Size.X.Scale * 1.25, 0, script.Parent.Frame.Size.Y.Scale * 1.25, 0)})
+	NewTween:Play()
+	NewTween.Completed:wait()
+	local NewTween = game:GetService("TweenService"):Create(script.Parent.Frame, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Size = UDim2.new(0.05, 0, 0.05, 0)})
+	NewTween:Play()
+	NewTween.Completed:wait()
+	script.Parent.Frame:Destroy()
+end
+
+
+-- Exit the gui
+script.Parent.Frame.ExitButton.MouseButton1Click:Connect(function()
+	Player.PlayerSounds.Click:Play()
+	CloseGui()
+end)
+
+-- Wants to upgrade the building
+script.Parent.Frame.UpgradeButton.MouseButton1Click:Connect(function()
+	game.Players.LocalPlayer.PlayerSounds.Click:Play()
+	CloseGui()
+	game.ReplicatedStorage.NetCommunications.UpgradeRequest:FireServer(game.Players.LocalPlayer.NPCNAME.Value, script.Parent.BuildingReference.Value)
+end)
+
+
+
+local OrigPos = game.Players.LocalPlayer.Character.HumanoidRootPart.Position
+local HRP = game.Players.LocalPlayer.Character.HumanoidRootPart
+
+while wait(0.2) do
+	if (HRP.Position - OrigPos).Magnitude > 7 then
+		CloseGui()
+		break
+	end
+end
+
+
+
+
+
+
+-- Script inside of SoldierManagerGUI (IMPROVE THIS IF CAN)
+
+-- Created by hunxrepair
+-- 2018/10/30
+
+
+local Player = game.Players.LocalPlayer
+local OrigSize = script.Parent:WaitForChild("Frame").Size
+script.Parent.Frame.Size = UDim2.new(0, 0, 0, 0)
+
+
+function Clear()
+	-- In use
+	for i,v in pairs(script.Parent.Frame.InUseFrame:GetChildren()) do
+		if v:IsA("Frame") then
+			v:Destroy()
+		end
+	end
+	
+	-- In storage
+	for i,v in pairs(script.Parent.Frame.InStorageFrame:GetChildren()) do
+		if v:IsA("Frame") then
+			v:Destroy()
+		end
+	end
+end
+
+
+function Load()
+	Clear()
+	
+	-- In use
+	for i,Soldier in pairs(game.Workspace["AIFolder"][Player.Team.Name][Player.Name]:GetChildren()) do
+		local NewFrame = script:WaitForChild("SoldierFrame"):Clone()
+		NewFrame.NameTitle.Text = Soldier.Name
+		NewFrame.SoldierImage.Image = Soldier.Stats.ItemImage.Texture
+		
+		-- Put a soldier into Storage
+		NewFrame.SoldierImage.MouseButton1Click:Connect(function()
+			Player.PlayerSounds.Click:Play()
+			local Status = game.ReplicatedStorage.NetCommunications.TransferSoldier:InvokeServer(Player.NPCNAME.Value, "InStorage", Soldier, script.Parent.BuildingReference.Value)
+			if Status == true then
+				Load()
+			end
+		end)
+		
+		NewFrame.Parent = script.Parent.Frame.InUseFrame
+	end
+	
+	-- In Storage
+	for i,Soldier in pairs(Player.StoredSoldiers:GetChildren()) do
+		local NewFrame = script:WaitForChild("SoldierFrame"):Clone()
+		NewFrame.NameTitle.Text = Soldier.Name
+		NewFrame.SoldierImage.Image = Soldier.Stats.ItemImage.Texture
+		
+		-- Put a soldier into use
+		NewFrame.SoldierImage.MouseButton1Click:Connect(function()
+			Player.PlayerSounds.Click:Play()
+			local Status = game.ReplicatedStorage.NetCommunications.TransferSoldier:InvokeServer(Player.NPCNAME.Value, "InUse", Soldier, script.Parent.BuildingReference.Value)
+			if Status == true then
+				Load()
+			end
+		end)
+		
+		NewFrame.Parent = script.Parent.Frame.InStorageFrame
+	end
+end
+
+
+
+Load()
+
+
+function OpenGui()
+	local NewTween = game:GetService("TweenService"):Create(script.Parent.Frame, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = OrigSize})
+	NewTween:Play()
+end
+OpenGui()
+function CloseGui()
+	if script.Parent:FindFirstChild("Frame") == nil then return end
+	require(game.ReplicatedStorage.ReplicatedUtilities).DebrisAddItem(script.Parent, 3)
+	
+	local NewTween = game:GetService("TweenService"):Create(script.Parent.Frame, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(script.Parent.Frame.Size.X.Scale * 1.25, 0, script.Parent.Frame.Size.Y.Scale * 1.25, 0)})
+	NewTween:Play()
+	NewTween.Completed:wait()
+	local NewTween = game:GetService("TweenService"):Create(script.Parent.Frame, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Size = UDim2.new(0.05, 0, 0.05, 0)})
+	NewTween:Play()
+	NewTween.Completed:wait()
+	script.Parent.Frame:Destroy()
+end
+
+
+-- Exit the gui
+script.Parent.Frame.ExitButton.MouseButton1Click:Connect(function()
+	Player.PlayerSounds.Click:Play()
+	CloseGui()
+end)
+
+-- Recruit new peasant
+script.Parent.Frame.RecruitButton.MouseButton1Click:Connect(function()
+	Player.PlayerSounds.Click:Play()
+	game.ReplicatedStorage.NetCommunications.RecruitSoldier:FireServer(Player.NPCNAME.Value, script.Parent.BuildingReference.Value)
+end)
+
+
+-- Wants to upgrade the building
+script.Parent.Frame.UpgradeButton.MouseButton1Click:Connect(function()
+	game.Players.LocalPlayer.PlayerSounds.Click:Play()
+	CloseGui()
+	game.ReplicatedStorage.NetCommunications.UpgradeRequest:FireServer(game.Players.LocalPlayer.NPCNAME.Value, script.Parent.BuildingReference.Value)
+end)
+
+
+
+local OrigPos = game.Players.LocalPlayer.Character.HumanoidRootPart.Position
+local HRP = game.Players.LocalPlayer.Character.HumanoidRootPart
+
+while wait(0.2) do
+	if (HRP.Position - OrigPos).Magnitude > 7 then
+		CloseGui()
+		break
+	end
+end
